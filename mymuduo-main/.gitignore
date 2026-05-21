@@ -1,0 +1,13 @@
+build/
+lib/
+package-test/
+
+*.o
+*.so
+*.a
+
+.vscode/
+.idea/
+
+*.swp
+*.swo

@@ -1,0 +1,56 @@
+#include "EventLoopThread.h"
+
+#include "EventLoop.h"
+
+EventLoopThread::EventLoopThread(const ThreadInitCallback& cb,
+                                 const std::string& name)
+    : loop_(nullptr),
+      exiting_(false),
+      loopThread_(std::bind(&EventLoopThread::threadFunc, this), name),
+      mutex_(),
+      cond_(),
+      callback_(cb) {}
+
+EventLoopThread::~EventLoopThread() 
+{
+  exiting_=true;
+  if(loop_!=nullptr)
+  {
+    loop_->quit();
+    loopThread_.join();
+  }
+}
+
+EventLoop* EventLoopThread::startLoop() 
+{
+    loopThread_.start();
+    EventLoop*loop=nullptr;
+    {
+      std::unique_lock<std::mutex>mtx(mutex_);
+      while(loop_==nullptr)
+      {
+        cond_.wait(mtx);
+      }
+      loop=loop_;
+    }
+    return loop;
+}
+
+void EventLoopThread::threadFunc() 
+{
+  EventLoop loop;
+  if(callback_)
+  {
+    callback_(&loop);
+  }
+  {
+    std::unique_lock<std::mutex>mtx(mutex_);
+    loop_=&loop;
+    cond_.notify_one();
+  }
+  loop.loop();
+  {
+    std::unique_lock<std::mutex>mtx(mutex_);
+    loop_=nullptr;
+  }
+}
